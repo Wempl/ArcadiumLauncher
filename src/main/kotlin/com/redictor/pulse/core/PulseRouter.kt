@@ -1,6 +1,5 @@
 package com.redictor.pulse.core
 
-// ОСТАВИТЬ ЭТУ СТРОКУ:
 typealias PulseHandler = (PulseRequest) -> String
 
 class PulseRouter {
