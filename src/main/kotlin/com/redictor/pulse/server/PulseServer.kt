@@ -20,9 +20,11 @@ class PulseServer(private val port: Int = 8080) {
         running = true
         
         println("PULSE FRAMEWORK v0.1.0")
-        println("Server started on http://localhost:$port")
         println("Created by redictor")
+        println(" ")
+        println("Server started on http://localhost:$port")
         println("Listening for connections...")
+        println(" ")
         
         while (running) {
             try {

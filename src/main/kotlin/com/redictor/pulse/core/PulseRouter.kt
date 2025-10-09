@@ -43,5 +43,6 @@ class PulseRouter {
                 println("   $method $path")
             }
         }
+        println(" ")
     }
 }
