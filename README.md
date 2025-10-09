@@ -51,6 +51,7 @@ Pulse is a contemporary web framework built with Kotlin, designed for developers
 ## 📖 Documentation
 
 Complete documentation with guides and examples is available in the project wiki. Learn how to integrate Pulse into your projects and explore advanced features.
+Documentation available on: https://redictor.github.io/PulseDocs
 
 ## 🤝 Contribution
 
