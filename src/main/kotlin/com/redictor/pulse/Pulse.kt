@@ -3,11 +3,22 @@ package com.redictor.pulse
 import com.redictor.pulse.core.PulseRouter
 import com.redictor.pulse.server.PulseServer
 
-class Pulse(var port: Int = 8080) {
-    private val server = PulseServer(port)
+class Pulse(private var _port: Int = 8080) {
+    private lateinit var server: PulseServer  // ← ОТКЛАДЫВАЕМ создание!
     private val router = PulseRouter()
     
+    // Публичное свойство для пользователя
+    var port: Int = _port
+        set(value) {
+            field = value
+            // При изменении порта пересоздаём сервер
+            server = PulseServer(value)
+            server.addRouter(router)
+        }
+    
     init {
+        // Инициализируем сервер с начальным портом
+        server = PulseServer(_port)
         server.addRouter(router)
     }
     
@@ -30,9 +41,10 @@ class Pulse(var port: Int = 8080) {
     fun start() {
         println("Starting Pulse Framework...")
         router.printRoutes()
-        server.start()
+        server.start()  // ← сервер будет с правильным портом!
     }
     
+    // HTML DSL функции без изменений
     fun html(block: () -> String): String {
         return "<!DOCTYPE html><html>${block()}</html>"
     }
