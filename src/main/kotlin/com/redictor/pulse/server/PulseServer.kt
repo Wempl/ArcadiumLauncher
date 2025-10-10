@@ -3,13 +3,16 @@ package com.redictor.pulse.server
 import com.redictor.pulse.core.PulseRequest
 import com.redictor.pulse.core.PulseRouter
 import java.io.BufferedReader
+import java.io.InputStreamReader
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.Executors
 
 class PulseServer(private val port: Int = 8080) {
     private var running = false
     private lateinit var serverSocket: ServerSocket
     private val routers = mutableListOf<PulseRouter>()
+    private val threadPool = Executors.newFixedThreadPool(10) // Пул потоков для параллельных запросов
     
     fun addRouter(router: PulseRouter) {
         routers.add(router)
@@ -19,7 +22,7 @@ class PulseServer(private val port: Int = 8080) {
         serverSocket = ServerSocket(port)
         running = true
         
-        println("PULSE FRAMEWORK v0.1.0")
+        println("PULSE FRAMEWORK v0.2.0")
         println("Created by redictor")
         println(" ")
         println("Server started on http://localhost:$port")
@@ -29,9 +32,9 @@ class PulseServer(private val port: Int = 8080) {
         while (running) {
             try {
                 val clientSocket = serverSocket.accept()
-                Thread { 
-                    handlePulseClient(clientSocket) 
-                }.start()
+                threadPool.submit {
+                    handlePulseClient(clientSocket)
+                }
             } catch (e: Exception) {
                 if (running) {
                     println("Pulse Server error: ${e.message}")
@@ -43,12 +46,13 @@ class PulseServer(private val port: Int = 8080) {
     fun stop() {
         running = false
         serverSocket.close()
+        threadPool.shutdown()
         println("Pulse Server stopped")
     }
     
     private fun handlePulseClient(client: Socket) {
         try {
-            val input = client.getInputStream().bufferedReader()
+            val input = BufferedReader(InputStreamReader(client.getInputStream()))
             val output = client.getOutputStream()
             
             val request = parsePulseRequest(input)
@@ -74,7 +78,7 @@ class PulseServer(private val port: Int = 8080) {
         }
         
         val method = parts[0]
-        val path = parts[1]
+        val fullPath = parts[1]
         
         val headers = mutableMapOf<String, String>()
         var line: String
@@ -85,48 +89,62 @@ class PulseServer(private val port: Int = 8080) {
             }
         }
         
-        return PulseRequest(method, path, headers)
+        val request = PulseRequest(method, fullPath, headers)
+        parseQueryParameters(fullPath, request)
+        
+        return request
+    }
+    
+    private fun parseQueryParameters(fullPath: String, request: PulseRequest) {
+        val pathParts = fullPath.split("?")
+        if (pathParts.size > 1) {
+            val queryString = pathParts[1]
+            queryString.split("&").forEach { param ->
+                val keyValue = param.split("=")
+                if (keyValue.size == 2) {
+                    request.queryParams[keyValue[0]] = keyValue[1]
+                } else if (keyValue.size == 1) {
+                    request.queryParams[keyValue[0]] = ""
+                }
+            }
+        }
     }
     
     private fun findPulseHandler(request: PulseRequest): String {
         for (router in routers) {
-            val handler = router.findHandler(request.method, request.path)
-            if (handler != null) {
-                return buildPulseResponse(handler.invoke(request))
+            val result = router.findHandler(request.method, request.path)
+            if (result != null) {
+                val (handler, pathParams) = result
+                request.pathParams.putAll(pathParams)
+                
+                val responseBody = handler.invoke(request)
+                val contentType = if (request.path == "/css") "text/css" else "text/html"
+                
+                return buildPulseResponse(responseBody, 200, contentType)
             }
         }
         
         return buildPulseResponse("""
             <!DOCTYPE html>
             <html>
-            <head>
-                <title>404 - Pulse Framework</title>
-            </head>
-            <body>
-                <h1>404 - Pulse Not Found</h1>
-                <p>No handler for ${request.method} ${request.path}</p>
-                <p><a href="/">Back to Pulse Home</a></p>
-            </body>
+            <head><title>404</title></head>
+            <body><h1>404 Not Found</h1></body>
             </html>
-        """.trimIndent(), 404)
+        """.trimIndent(), 404, "text/html")
     }
     
-    private fun buildPulseResponse(body: String, statusCode: Int = 200): String {
+    private fun buildPulseResponse(body: String, statusCode: Int = 200, contentType: String = "text/html"): String {
         val statusText = when (statusCode) {
             200 -> "OK"
             404 -> "Not Found"
-            500 -> "Internal Server Error"
             else -> "Unknown"
         }
         
-        return """
-HTTP/1.1 $statusCode $statusText
-Content-Type: text/html; charset=utf-8
+        return """HTTP/1.1 $statusCode $statusText
+Content-Type: $contentType
 Content-Length: ${body.length}
 Connection: close
-X-Powered-By: Pulse/0.1.0
 
-$body
-        """.trimIndent()
+$body"""
     }
 }
