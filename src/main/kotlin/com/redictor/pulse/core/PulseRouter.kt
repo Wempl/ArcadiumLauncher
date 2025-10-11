@@ -12,25 +12,17 @@ class PulseRouter {
     private val routes = mutableMapOf<String, MutableList<Pair<RoutePattern, PulseHandler>>>()
     
     init {
-        listOf("GET", "POST", "PUT", "DELETE").forEach { method ->
-            routes[method] = mutableListOf()
-        }
+        listOf("GET", "POST", "PUT", "DELETE").forEach { method -> routes[method] = mutableListOf() }
     }
     
     private fun compilePathPattern(pattern: String): RoutePattern {
         val parameterNames = mutableListOf<String>()
-        val regexPattern = StringBuilder()
-        regexPattern.append("^")
+        val regexPattern = StringBuilder("^")
         
-        if (pattern == "/" || pattern.isEmpty()) {
-            return RoutePattern(pattern, Regex("^/$"), emptyList())
-        }
+        if (pattern == "/" || pattern.isEmpty()) return RoutePattern(pattern, Regex("^/$"), emptyList())
         
         val segments = pattern.split('/').filter { it.isNotEmpty() }
-        
-        if (segments.isEmpty()) {
-            return RoutePattern(pattern, Regex("^/$"), emptyList())
-        }
+        if (segments.isEmpty()) return RoutePattern(pattern, Regex("^/$"), emptyList())
         
         regexPattern.append("/")
         
@@ -42,19 +34,11 @@ class PulseRouter {
             } else {
                 regexPattern.append(Regex.escape(segment))
             }
-            
-            if (index < segments.size - 1) {
-                regexPattern.append("/")
-            }
+            if (index < segments.size - 1) regexPattern.append("/")
         }
         
         regexPattern.append("/*$")
-        
-        return RoutePattern(
-            originalPattern = pattern,
-            regex = Regex(regexPattern.toString()),
-            parameterNames = parameterNames
-        )
+        return RoutePattern(pattern, Regex(regexPattern.toString()), parameterNames)
     }
     
     private fun addRoute(method: String, path: String, handler: PulseHandler) {
@@ -74,33 +58,22 @@ class PulseRouter {
         
         for ((routePattern, handler) in methodRoutes) {
             val matchResult = routePattern.regex.find(cleanPath)
-            if (matchResult != null) {
-                val parameters = extractParameters(matchResult, routePattern.parameterNames)
-                return handler to parameters
-            }
+            if (matchResult != null) return handler to extractParameters(matchResult, routePattern.parameterNames)
         }
-        
         return null
     }
     
     private fun extractParameters(matchResult: MatchResult, parameterNames: List<String>): Map<String, String> {
         val parameters = mutableMapOf<String, String>()
-        
-        parameterNames.forEachIndexed { index, name ->
-            val value = matchResult.groups[index + 1]?.value ?: ""
-            parameters[name] = value
-        }
-        
+        parameterNames.forEachIndexed { index, name -> parameters[name] = matchResult.groups[index + 1]?.value ?: "" }
         return parameters
     }
     
     fun printRoutes() {
         println("Pulse Routes:")
         routes.forEach { (method, patterns) ->
-            patterns.forEach { (routePattern, _) ->
-                println("   $method ${routePattern.originalPattern}")
-            }
+            patterns.forEach { (routePattern, _) -> println("   $method ${routePattern.originalPattern}") }
         }
-        println(" ")
+        println()
     }
 }

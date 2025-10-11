@@ -12,7 +12,7 @@ class PulseServer(private val port: Int = 8080) {
     private var running = false
     private lateinit var serverSocket: ServerSocket
     private val routers = mutableListOf<PulseRouter>()
-    private val threadPool = Executors.newFixedThreadPool(10) // Пул потоков для параллельных запросов
+    private val threadPool = Executors.newFixedThreadPool(10)
     
     fun addRouter(router: PulseRouter) {
         routers.add(router)
@@ -24,10 +24,10 @@ class PulseServer(private val port: Int = 8080) {
         
         println("PULSE FRAMEWORK v0.2.0")
         println("Created by redictor")
-        println(" ")
+        println()
         println("Server started on http://localhost:$port")
         println("Listening for connections...")
-        println(" ")
+        println()
         
         while (running) {
             try {
@@ -36,9 +36,7 @@ class PulseServer(private val port: Int = 8080) {
                     handlePulseClient(clientSocket)
                 }
             } catch (e: Exception) {
-                if (running) {
-                    println("Pulse Server error: ${e.message}")
-                }
+                if (running) println("Pulse Server error: ${e.message}")
             }
         }
     }
@@ -60,7 +58,7 @@ class PulseServer(private val port: Int = 8080) {
             
             val response = findPulseHandler(request)
             
-            output.write(response.toByteArray())
+            output.write(response.toByteArray(Charsets.UTF_8))
             output.flush()
         } catch (e: Exception) {
             println("Pulse Client error: ${e.message}")
@@ -73,9 +71,7 @@ class PulseServer(private val port: Int = 8080) {
         val requestLine = input.readLine() ?: ""
         val parts = requestLine.split(" ")
         
-        if (parts.size < 2) {
-            return PulseRequest("GET", "/")
-        }
+        if (parts.size < 2) return PulseRequest("GET", "/")
         
         val method = parts[0]
         val fullPath = parts[1]
@@ -84,14 +80,11 @@ class PulseServer(private val port: Int = 8080) {
         var line: String
         while (input.readLine().also { line = it } != null && line.isNotEmpty()) {
             val headerParts = line.split(":", limit = 2)
-            if (headerParts.size == 2) {
-                headers[headerParts[0].trim()] = headerParts[1].trim()
-            }
+            if (headerParts.size == 2) headers[headerParts[0].trim()] = headerParts[1].trim()
         }
         
         val request = PulseRequest(method, fullPath, headers)
         parseQueryParameters(fullPath, request)
-        
         return request
     }
     
@@ -101,11 +94,8 @@ class PulseServer(private val port: Int = 8080) {
             val queryString = pathParts[1]
             queryString.split("&").forEach { param ->
                 val keyValue = param.split("=")
-                if (keyValue.size == 2) {
-                    request.queryParams[keyValue[0]] = keyValue[1]
-                } else if (keyValue.size == 1) {
-                    request.queryParams[keyValue[0]] = ""
-                }
+                if (keyValue.size == 2) request.queryParams[keyValue[0]] = keyValue[1]
+                else if (keyValue.size == 1) request.queryParams[keyValue[0]] = ""
             }
         }
     }
@@ -117,7 +107,7 @@ class PulseServer(private val port: Int = 8080) {
                 val (handler, pathParams) = result
                 request.pathParams.putAll(pathParams)
                 
-                val responseBody = handler.invoke(request)
+                val responseBody = handler(request)
                 val contentType = if (request.path == "/css") "text/css" else "text/html"
                 
                 return buildPulseResponse(responseBody, 200, contentType)
@@ -142,7 +132,7 @@ class PulseServer(private val port: Int = 8080) {
         
         return """HTTP/1.1 $statusCode $statusText
 Content-Type: $contentType
-Content-Length: ${body.length}
+Content-Length: ${body.toByteArray(Charsets.UTF_8).size}
 Connection: close
 
 $body"""
